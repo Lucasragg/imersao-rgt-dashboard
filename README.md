@@ -6,7 +6,9 @@ Dashboard estático em português com visão geral, Meta Ads e relatório diári
 
 Informe as quatro variáveis de ambiente `META_SHEET_ID`, `META_GID`, `SALES_SHEET_ID` e `SALES_GID`. Os GIDs são `0` para `Página1` e `225855859` para `Vendas`. Execute `python3 scripts/build.py`. O navegador pode abrir o arquivo `dist/index.html` para conferir o resultado. Os gráficos usam Chart.js via CDN.
 
-O build conta transações com pagamento confirmado, deduplica pelo ID e lê o esquema atual de Vendas, em que status e valor aparecem em C e H. A receita geral inclui todas as origens. A visão Meta Ads usa os parâmetros de rastreamento e só atribui receita a uma campanha se a UTM corresponder ao nome da campanha. O indicador de ROAS geral divide a receita de todas as origens pelo investimento no Meta Ads. Campos pessoais e identificadores de transação ficam fora da saída do build.
+O build conta transações com pagamento confirmado, deduplica pelo ID e lê o esquema atual de Vendas, em que status e valor aparecem em C e H. A receita geral inclui todas as origens. A visão Meta Ads usa os parâmetros de rastreamento e só atribui receita a uma campanha se a UTM corresponder ao nome da campanha. O painel mostra a conciliação entre vendas da planilha, vendas Meta Ads e vendas com campanha vinculada; a tabela de origens expõe UTMs agrupadas para permitir conferir o cruzamento. Origem orgânica/WhatsApp não é atribuída ao Meta Ads. O indicador de ROAS geral divide a receita de todas as origens pelo investimento no Meta Ads. Campos pessoais e identificadores de transação ficam fora da saída do build.
+
+A aba `Vendas` tem GID `225855859`. O GID `1710545547` abre `Webhook_Bruto` e não deve substituir a origem de vendas.
 
 ## GitHub Pages
 

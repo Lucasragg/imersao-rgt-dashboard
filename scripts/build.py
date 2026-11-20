@@ -107,6 +107,7 @@ def classify(values, campaign_index):
 def sales_data(meta):
     campaign_index = {normalize(row[1]): row[1] for row in meta}
     totals = defaultdict(lambda: [0, 0])
+    tracking = defaultdict(lambda: [0, 0])
     transactions = {}
     for row, header in read_sheet("SALES", SALES_COLUMNS):
         values, state, amount, _ = sale_fields(row, header)
@@ -122,13 +123,19 @@ def sales_data(meta):
         bucket = totals[(timestamp[0], channel, campaign)]
         bucket[0] += 1
         bucket[1] += int(number(amount) * 100)
-    return [list(key) + measures for key, measures in sorted(totals.items())]
+        origin = tracking[(timestamp[0], channel, campaign, values["utm_source"],
+                           values["utm_medium"], values["utm_campaign"], values["utm_content"])]
+        origin[0] += 1
+        origin[1] += int(number(amount) * 100)
+    return ([list(key) + measures for key, measures in sorted(totals.items())],
+            [list(key) + measures for key, measures in sorted(tracking.items())])
 
 
 def main():
     meta = meta_data()
-    sales = sales_data(meta)
-    data = {"generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(), "meta": meta, "sales": sales}
+    sales, tracking = sales_data(meta)
+    data = {"generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(), "meta": meta,
+            "sales": sales, "salesTracking": tracking}
     document = (ROOT / "src/index.html").read_text(encoding="utf-8")
     document = document.replace("/* DASHBOARD_CSS */", (ROOT / "src/style.css").read_text(encoding="utf-8"))
     document = document.replace("/* DASHBOARD_JS */", (ROOT / "src/dashboard.js").read_text(encoding="utf-8"))

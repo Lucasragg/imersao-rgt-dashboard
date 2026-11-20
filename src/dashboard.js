@@ -219,6 +219,19 @@ function render() {
   const sales = isMeta ? allSales.filter(row => row[1] === "Meta Ads" && (!campaign || row[2] === campaign)) : allSales;
   const summary = totals(meta, 4, 5);
   const salesSum = totals(sales, 3, 2);
+  const metaSales = allSales.filter(row => row[1] === "Meta Ads");
+  const linkedSales = metaSales.filter(row => row[2] && (!campaign || row[2] === campaign));
+  const describeSales = rows => {
+    const [orders, revenue] = totals(rows, 3, 2);
+    return numbers.format(orders) + " vendas · " + money(revenue);
+  };
+  get("sales-total").textContent = describeSales(allSales);
+  get("sales-meta").textContent = describeSales(metaSales);
+  get("sales-linked").textContent = describeSales(linkedSales);
+  get("sales-linked-label").textContent = campaign ? "Vendas vinculadas à campanha selecionada" : "Vendas com campanha vinculada";
+  get("sales-attribution-note").textContent = "Fonte: aba Vendas da planilha de compradores. Pagamentos confirmados, sem duplicar transações. " +
+    (metaSales.length ? "O vínculo por campanha exige correspondência da UTM com o nome no Meta Ads." :
+      "Nenhuma venda deste período tem atribuição ao Meta Ads pelos parâmetros registrados. Consulte as UTMs em Vendas por origem.");
   const byMetaDay = grouped(meta, 0);
   const bySalesDay = grouped(sales, 0);
   const daily = days.filter(day => within([day])).map(day => [day, totals(byMetaDay.get(day) || [], 4, 5), totals(bySalesDay.get(day) || [], 3, 2)]);
@@ -245,11 +258,17 @@ function render() {
   if (isMeta) {
     table("secondary-table", metaColumns, breakdown(meta, sales));
   } else {
-    table("secondary-table", ["Origem", "Pedidos pagos", "Receita"],
-      ["Meta Ads", "Outros canais", "Sem atribuição"].map(channel => {
-        const [count, value] = totals(sales.filter(row => row[1] === channel), 3, 2);
-        return [[channel, numbers.format(count), money(value)]];
-      }));
+    const origins = new Map();
+    for (const row of data.salesTracking.filter(within)) {
+      const key = JSON.stringify(row.slice(1, 7));
+      if (!origins.has(key)) origins.set(key, [row.slice(1, 7), 0, 0]);
+      origins.get(key)[1] += row[7];
+      origins.get(key)[2] += row[8];
+    }
+    table("secondary-table", ["Origem UTM", "Meio UTM", "Campanha UTM", "Conteúdo UTM", "Classificação", "Pedidos pagos", "Receita"],
+      [...origins.values()].sort((a,b)=>b[2]-a[2]).map(([[channel, linked, source, medium, campaignUTM, content], count, value]) =>
+        [[source || "Não informado", medium || "—", campaignUTM || "—", content || "Não informado", channel, numbers.format(count), money(value)]]));
+    get("secondary-note").textContent = "Parâmetros registrados na aba Vendas. WhatsApp e origem orgânica entram no total geral; o vínculo com campanhas do Meta Ads exige UTMs compatíveis.";
   }
 }
 function reset() {
