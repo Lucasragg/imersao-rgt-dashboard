@@ -129,16 +129,16 @@ def main():
     meta = meta_data()
     sales = sales_data(meta)
     data = {"generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(), "meta": meta, "sales": sales}
-    document = (ROOT / "src/index.html").read_text()
-    document = document.replace("/* DASHBOARD_CSS */", (ROOT / "src/style.css").read_text())
-    document = document.replace("/* DASHBOARD_JS */", (ROOT / "src/dashboard.js").read_text())
+    document = (ROOT / "src/index.html").read_text(encoding="utf-8")
+    document = document.replace("/* DASHBOARD_CSS */", (ROOT / "src/style.css").read_text(encoding="utf-8"))
+    document = document.replace("/* DASHBOARD_JS */", (ROOT / "src/dashboard.js").read_text(encoding="utf-8"))
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     document = document.replace("<!-- DASHBOARD_DATA -->", payload)
     dist = ROOT / "dist"
     shutil.rmtree(dist, ignore_errors=True)
     dist.mkdir()
-    (dist / "index.html").write_text(document)
-    (dist / "version.json").write_text(json.dumps({"generatedAt": data["generatedAt"]}))
+    (dist / "index.html").write_text(document, encoding="utf-8")
+    (dist / "version.json").write_text(json.dumps({"generatedAt": data["generatedAt"]}), encoding="utf-8")
     (dist / ".nojekyll").touch()
     print(f"Build concluído. {len(meta)} agrupamentos Meta e {len(sales)} agrupamentos de vendas.")
 

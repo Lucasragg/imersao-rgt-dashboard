@@ -1,46 +1,21 @@
 <!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>Imersão RGT · Tráfego pago</title>
-<style>/* DASHBOARD_CSS */</style>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script>
-</head>
-<body>
-<aside class="sidebar">
-  <a class="brand" href="#geral"><span class="brand-mark">R</span><span><strong>Imersão RGT</strong><small>Controle de tráfego</small></span></a>
-  <nav aria-label="Navegação do dashboard">
-    <a href="#geral">Visão geral</a>
-    <a href="#meta">Meta Ads</a>
-    <a href="#relatorio">Relatório</a>
-  </nav>
-  <span class="side-foot">Fonte · Google Sheets</span>
-</aside>
-<main>
-  <header>
-    <div><p class="eyebrow">IMERSAO</p><h1 id="page-title">Visão geral</h1></div>
-    <div class="update"><span id="updated"></span><button id="refresh" type="button">Buscar atualização</button></div>
-  </header>
-  <p id="refresh-status" class="status" role="status" hidden></p>
-  <form id="filters" class="filters" aria-label="Filtros do dashboard">
-    <label>De<input id="start" type="date" required></label>
-    <label>Até<input id="end" type="date" required></label>
-    <label id="campaign-filter">Campanha<select id="campaign"><option value="">Todas as campanhas</option></select></label>
-    <button type="button" id="reset" class="subtle">Limpar filtros</button>
-  </form>
-  <div id="metrics" class="metrics" aria-label="Indicadores principais"></div>
-  <div id="overview">
-    <div class="section-grid">
-      <section class="panel"><h2>Funil</h2><p id="funnel-note" class="note"></p><div id="funnel"></div></section>
-      <section class="panel"><h2>Evolução diária</h2><p class="note" id="chart-note"></p><div class="chart"><canvas id="trend" role="img" aria-label="Gráfico diário de gasto, receita e pedidos pagos"></canvas><p id="chart-fallback" hidden>Os valores estão disponíveis no Relatório.</p></div></section>
-    </div>
-    <section id="secondary" class="panel"><h2 id="secondary-title"></h2><p id="secondary-note" class="note"></p><div class="table-scroll"><table id="secondary-table"></table></div></section>
-  </div>
-  <section id="report" class="panel" hidden><h2>Resultados por dia</h2><p class="note">As vendas incluem todas as origens. As etapas de tráfego vêm do Meta Ads.</p><div class="table-scroll"><table id="daily"></table></div></section>
-</main>
-<script type="application/json" id="dashboard-data"><!-- DASHBOARD_DATA --></script>
-<script>/* DASHBOARD_JS */</script>
-</body>
-</html>
+<html lang="pt-BR" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark light"><title>Imersão RGT · Dashboard</title>
+<style>/* DASHBOARD_CSS */</style><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script></head>
+<body><aside class="sidebar"><a class="brand" href="#geral"><strong>Imersão RGT</strong><small>CONTROLE DE TRÁFEGO</small></a><div class="nav-label">DASHBOARDS</div>
+<nav aria-label="Navegação do dashboard"><a href="#geral"><span aria-hidden="true">◱</span>Visão Geral</a><a href="#meta"><span aria-hidden="true">◫</span>Meta Ads</a><a href="#relatorio"><span aria-hidden="true">▤</span>Relatórios</a></nav>
+<div class="side-foot">Somente leitura · Google Sheets<br><span id="side-updated"></span></div></aside>
+<main><header class="topbar"><h1 id="page-title">Visão Geral</h1><form id="filters" class="filters" aria-label="Filtros do dashboard">
+<details class="period-picker" id="period-picker"><summary><span aria-hidden="true">▣</span><span id="period-label">Selecionar período</span><span>⌄</span></summary><div class="period-pop"><div class="presets"><button type="button" data-days="0">Todo o período</button><button type="button" data-days="1">Último dia</button><button type="button" data-days="7">Últimos 7 dias</button><button type="button" data-days="30">Últimos 30 dias</button></div><div class="date-fields"><label>Data inicial<input id="start" type="date" required></label><label>Data final<input id="end" type="date" required></label><button type="button" id="apply-period" class="primary">Aplicar período</button></div></div></details>
+<button type="button" id="reset">Remover filtros</button><label id="campaign-filter" hidden><span class="sr-only">Campanha</span><select id="campaign"><option value="">Todas as campanhas</option></select></label></form>
+<button id="theme" type="button" aria-label="Alternar tema" aria-pressed="false">◐ Tema</button><div class="update"><span>Última atualização:<br><span id="updated"></span></span><button id="refresh" class="primary" type="button">↻ Atualizar dados</button></div></header>
+<div class="page-content"><p id="refresh-status" class="status" role="status" hidden></p><div id="metrics" hidden></div>
+<div id="overview"><h2 class="section-title">Funil &amp; evolução diária</h2><div class="section-grid">
+<section class="panel funnel-panel" aria-label="Funil de resultados"><div id="funnel"></div><p id="funnel-note" class="note"></p></section>
+<section class="panel evolution-panel"><div class="chart-header"><h2>Evolução diária</h2><p class="note" id="chart-note"></p></div><div class="chart"><canvas id="trend" role="img" aria-label="Evolução diária de vendas, gasto, faturamento e ROAS"></canvas><p id="chart-fallback" hidden>Consulte os valores na tabela abaixo.</p></div><div class="table-scroll daily-scroll"><table id="trend-table"></table></div><p class="note table-note">Vendas e faturamento seguem a visão selecionada. Gasto e etapas de tráfego vêm do Meta Ads. Clique em uma data para filtrar o período.</p></section></div>
+<h2 class="section-title">Indicadores por dia</h2><div class="indicators">
+<section class="panel"><h2>CPM e CTR por dia</h2><p class="note">CPM (R$, esq.) · CTR (%, dir.)</p><div class="chart chart-sm"><canvas id="cost-chart" role="img" aria-label="CPM e CTR por dia"></canvas></div></section>
+<section class="panel"><h2>Connect Rate e VisCHK por dia</h2><p class="note">CR = Visitas/Cliques · VisCHK = Checkouts/Visitas</p><div class="chart chart-sm"><canvas id="connect-chart" role="img" aria-label="Connect Rate e visitas para checkout por dia"></canvas></div></section>
+<section class="panel wide"><h2>ConvLP e ConvCHK por dia</h2><p class="note">ConvLP = Pedidos/Visitas · ConvCHK = Pedidos/Checkouts · <span id="conversion-scope"></span></p><div class="chart chart-sm"><canvas id="conversion-chart" role="img" aria-label="Conversão de página e checkout por dia"></canvas></div></section></div>
+<h2 class="section-title" id="secondary-heading">Vendas por origem</h2><section id="secondary" class="panel"><h2 id="secondary-title"></h2><p id="secondary-note" class="note"></p><div class="table-scroll"><table id="secondary-table"></table></div></section></div>
+<section id="report" hidden><h2 class="section-title">Funil dia a dia</h2><div class="panel"><h2>Resultados por dia</h2><p class="note">Vendas de todas as origens e etapas de tráfego do Meta Ads.</p><div class="table-scroll"><table id="daily"></table></div></div></section></div></main>
+<script type="application/json" id="dashboard-data"><!-- DASHBOARD_DATA --></script><script>/* DASHBOARD_JS */</script></body></html>
