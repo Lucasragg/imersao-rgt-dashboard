@@ -12,7 +12,6 @@ const stages = ["Impressões", "Cliques no link", "Visualizações da página", 
 const pages = {geral:"Visão Geral", meta:"Meta Ads", relatorio:"Relatórios"};
 const days = [...new Set([...data.meta, ...data.sales].map(row => row[0]))].sort();
 const campaigns = [...new Set(data.meta.map(row => row[1]))].sort();
-const metaColumns = ["Campanha, conjunto ou anúncio", "Gasto", "Impressões", "Cliques", "Visitas", "Checkouts", "Pedidos atribuídos", "Receita atribuída"];
 
 
 function element(tag, value, className) {
@@ -182,27 +181,223 @@ function renderDaily(daily, summary, sales) {
   });
 }
 
-function breakdown(group, attribution) {
-  const entries = [];
-  for (const [campaign, rows] of grouped(group, 1)) {
-    const metrics = totals(rows, 4, 5);
-    const sales = totals(attribution.filter(row=>row[2] === campaign), 3, 2);
-    const details = element("details");
-    details.append(element("summary", campaign));
-    for (const [set, ads] of grouped(rows, 2)) {
-      const adDetails = element("details", undefined, "breakdown");
-      adDetails.append(element("summary", set || "Conjunto sem nome"));
-      for (const [ad, adRows] of grouped(ads, 3)) {
-        const [spend, impressions, clicks, views, checkouts] = totals(adRows, 4, 5);
-        const info = [money(spend), numbers.format(impressions) + " impressões", numbers.format(clicks) + " cliques", numbers.format(views) + " visitas", numbers.format(checkouts) + " checkouts"];
-        adDetails.append(element("p", (ad || "Anúncio sem nome") + " · " + info.join(" · "), "note"));
-      }
-      details.append(adDetails);
-    }
-    entries.push([["", money(metrics[0]), ...metrics.slice(1).map(value=>numbers.format(value)), numbers.format(sales[0]), money(sales[1])], [details]]);
-  }
-  return entries;
+const entityMetrics = [
+  {id:"spend",label:"Gasto",unit:"money",value:(m,s)=>m[0]/100},
+  {id:"cpm",label:"CPM",unit:"money",value:(m,s)=>ratio(m[0]/100,m[1],1000)},
+  {id:"ctr",label:"CTR",unit:"percent",value:(m,s)=>ratio(m[2],m[1],100)},
+  {id:"cr",label:"CR",unit:"percent",value:(m,s)=>ratio(m[3],m[2],100)},
+  {id:"vischk",label:"VisCHK",unit:"percent",value:(m,s)=>ratio(m[4],m[3],100)},
+  {id:"convchk",label:"ConvCHK",unit:"percent",value:(m,s)=>ratio(s[0],m[4],100)},
+  {id:"orders",label:"Vendas",unit:"orders",value:(m,s)=>s[0]},
+  {id:"cac",label:"CAC",unit:"money",value:(m,s)=>ratio(m[0]/100,s[0])},
+  {id:"revenue",label:"Faturamento",unit:"money",value:(m,s)=>s[1]/100},
+  {id:"ticket",label:"Ticket",unit:"money",value:(m,s)=>ratio(s[1]/100,s[0])},
+  {id:"roas",label:"ROAS",unit:"roas",value:(m,s)=>ratio(s[1],m[0])}
+];
+const entityLevels = [
+  {id:"campaigns",title:"Campanhas",singular:"Campanha",level:1},
+  {id:"adsets",title:"Conjuntos (Ad Sets)",singular:"Conjunto",level:2},
+  {id:"ads",title:"Anúncios",singular:"Anúncio",level:3}
+];
+const entityState = Object.fromEntries(entityLevels.map(item=>[item.id,{selected:new Set(),metrics:new Set(["spend"]),total:false}]));
+const seriesColors = ["#2f6bff","#16d66b","#ffb020","#9d5cff","#ff3b47","#1fd5ec","#ff4d8d","#9be015","#ff8a1f","#6d7bff"];
+function metricText(value, unit) {
+  if (value === null || !Number.isFinite(value)) return "—";
+  if (unit === "money") return currency.format(value);
+  if (unit === "percent") return numbers.format(Math.round(value*100)/100)+"%";
+  if (unit === "roas") return numbers.format(Math.round(value*100)/100)+"x";
+  return numbers.format(value);
 }
+function entityKey(row, level) { return JSON.stringify(row.slice(1,level+1)); }
+function entityGroups(rows, level, sales) {
+  const groups = new Map();
+  const knownKeys = new Set(data.meta.map(row=>entityKey(row,level)));
+  for (const row of rows) {
+    const key=entityKey(row,level);
+    if (!groups.has(key)) groups.set(key,{key,path:row.slice(1,level+1),rows:[],sales:[]});
+    groups.get(key).rows.push(row);
+  }
+  for (const sale of sales) {
+    if (sale.slice(1,level+1).some(name=>!name)) continue;
+    const key=entityKey(sale,level);
+    if (!knownKeys.has(key)) continue;
+    if (!groups.has(key)) groups.set(key,{key,path:sale.slice(1,level+1),rows:[],sales:[]});
+    groups.get(key).sales.push(sale);
+  }
+  return [...groups.values()].sort((a,b)=>totals(b.rows,4,5)[0]-totals(a.rows,4,5)[0] || a.key.localeCompare(b.key));
+}
+function entityMeasures(group) { return [totals(group.rows,4,5),totals(group.sales,4,2)]; }
+function renderEntityAnalysis(meta, within) {
+  const root=get("entity-analysis");
+  if (!root.childElementCount) {
+    const introduction=element("div",undefined,"entity-introduction");
+    introduction.append(element("h2","Campanhas, conjuntos e anúncios"),element("p",
+      "Clique no cabeçalho para escolher a métrica ou em um valor para ver aquele item no gráfico. Ctrl/⌘ + clique compara métricas. Selecione linhas para comparar itens; campanhas filtram conjuntos e anúncios, e conjuntos filtram anúncios.","note"));
+    root.append(introduction);
+    for (const config of entityLevels) {
+      const card=element("section",undefined,"entity-card");
+      card.id=config.id+"-panel";
+      const heading=element("div",undefined,"entity-heading");
+      heading.append(element("h2",config.title));
+      const clear=element("button","Limpar seleção","entity-clear");
+      clear.type="button";
+      clear.addEventListener("click",()=>{entityState[config.id].selected.clear();entityState[config.id].total=false;render();});
+      heading.append(clear);
+      const scroller=element("div",undefined,"table-scroll entity-scroll");
+      const tableNode=element("table");tableNode.id=config.id+"-table";scroller.append(tableNode);
+      const chartHeader=element("div",undefined,"entity-chart-header");
+      const title=element("h3");title.id=config.id+"-chart-title";
+      const status=element("p",undefined,"note");status.id=config.id+"-chart-status";status.setAttribute("role","status");
+      chartHeader.append(title,status);
+      const chartBox=element("div",undefined,"chart entity-chart");
+      const canvas=element("canvas");canvas.id=config.id+"-chart";canvas.setAttribute("role","img");chartBox.append(canvas);
+      card.append(heading,scroller,chartHeader,chartBox);
+      root.append(card);
+    }
+    root.append(element("p","Vendas e faturamento vêm da aba Vendas. Campanhas exigem correspondência da UTM; conjuntos e anúncios exigem um nome de anúncio único na campanha em utm_content. Vendas sem esse vínculo não são distribuídas entre itens.","note attribution-footnote"));
+  }
+  const entitySales=(data.salesEntities || []).filter(within);
+  const dailyDays=days.filter(day=>within([day]));
+  let scopedMeta=meta;
+  let scopedSales=entitySales.filter(row=>!get("campaign").value || row[1]===get("campaign").value);
+  for (const config of entityLevels) {
+    const state=entityState[config.id];
+    const groups=entityGroups(scopedMeta,config.level,scopedSales);
+    const keys=new Set(groups.map(group=>group.key));
+    for (const key of state.selected) if (!keys.has(key)) state.selected.delete(key);
+    renderEntityTable(config,groups);
+    renderEntityChart(config,groups,dailyDays);
+    if (state.selected.size) {
+      scopedMeta=scopedMeta.filter(row=>state.selected.has(entityKey(row,config.level)));
+      scopedSales=scopedSales.filter(row=>state.selected.has(entityKey(row,config.level)));
+    }
+  }
+}
+function renderEntityTable(config,groups) {
+  const state=entityState[config.id], node=get(config.id+"-table");
+  const head=element("thead"), header=element("tr");
+  const nameCell=element("th");nameCell.scope="col";
+  const selectAll=element("input");selectAll.type="checkbox";
+  selectAll.setAttribute("aria-label","Selecionar todos: "+config.title);
+  selectAll.checked=groups.length>0 && groups.every(group=>state.selected.has(group.key));
+  selectAll.indeterminate=state.selected.size>0 && !selectAll.checked;
+  selectAll.disabled=!groups.length;
+  selectAll.addEventListener("change",()=>{state.selected=new Set(selectAll.checked?groups.map(group=>group.key):[]);state.total=false;render();});
+  const nameHeading=element("span",config.singular);
+  const firstHeader=element("div",undefined,"entity-name-heading");firstHeader.append(selectAll,nameHeading);nameCell.append(firstHeader);header.append(nameCell);
+  for (const metric of entityMetrics) {
+    const cell=element("th");cell.scope="col";
+    cell.classList.toggle("selected-metric",state.metrics.has(metric.id));
+    const button=element("button",metric.label,"metric-select");button.type="button";button.dataset.metric=metric.id;
+    button.title="Mostrar "+metric.label+" no gráfico. Ctrl/⌘ + clique para comparar métricas.";
+    button.setAttribute("aria-pressed",String(state.metrics.has(metric.id)));
+    button.addEventListener("click",event=>{
+      if (event.ctrlKey || event.metaKey) {
+        if (state.metrics.has(metric.id) && state.metrics.size>1) state.metrics.delete(metric.id);
+        else state.metrics.add(metric.id);
+      } else state.metrics=new Set([metric.id]);
+      render();
+      get(config.id+"-table").querySelector('[data-metric="'+metric.id+'"]').focus({preventScroll:true});
+    });
+    cell.append(button);header.append(cell);
+  }
+  head.append(header);
+  const body=element("tbody");
+  groups.forEach((group,index)=>{
+    const row=element("tr");
+    row.dataset.key=group.key;
+    row.classList.toggle("selected-entity",state.selected.has(group.key));
+    const nameCell=element("td"), label=element("label",undefined,"entity-name");
+    const checkbox=element("input");checkbox.type="checkbox";checkbox.checked=state.selected.has(group.key);
+    checkbox.setAttribute("aria-label","Comparar "+group.path.join(" / "));
+    checkbox.addEventListener("change",()=>{
+      if(checkbox.checked) state.selected.add(group.key);else state.selected.delete(group.key);
+      state.total=false;render();
+    });
+    const name=element("span",group.path.at(-1)||"Sem nome");name.title=group.path.join(" / ");
+    if (groups.filter(item=>item.path.at(-1)===group.path.at(-1)).length>1) {
+      name.append(element("small",group.path.slice(0,-1).join(" / "),"entity-parent"));
+    }
+    const dot=element("i",undefined,"series-dot");dot.style.background=seriesColors[index%seriesColors.length];
+    label.append(checkbox,dot,name);nameCell.append(label);row.append(nameCell);
+    const [metrics,sales]=entityMeasures(group);
+    for (const metric of entityMetrics) {
+      const cell=element("td");
+      const value=element("button",metricText(metric.value(metrics,sales),metric.unit),"metric-value");
+      value.type="button";
+      value.title="Ver "+metric.label+" de "+group.path.join(" / ")+" no gráfico";
+      value.setAttribute("aria-label",value.title+": "+value.textContent);
+      value.addEventListener("click",event=>{
+        if(event.ctrlKey || event.metaKey) { state.metrics.add(metric.id);state.selected.add(group.key); }
+        else { state.metrics=new Set([metric.id]);state.selected=new Set([group.key]); }
+        state.total=false;render();
+      });
+      cell.append(value);
+      cell.classList.toggle("selected-metric",state.metrics.has(metric.id));
+      row.append(cell);
+    }
+    body.append(row);
+  });
+  if (!groups.length) {
+    const row=element("tr"),cell=element("td","Nenhum item no período e nos filtros selecionados.");
+    cell.colSpan=entityMetrics.length+1;row.append(cell);body.append(row);
+  }
+  const foot=element("tfoot"), totalRow=element("tr"), label=element("td");
+  const total=element("button","Total Geral","total-select");total.type="button";total.setAttribute("aria-pressed",String(state.total));
+  total.addEventListener("click",()=>{state.selected.clear();state.total=!state.total;render();});
+  label.append(total);totalRow.append(label);
+  const metrics=totals(groups.flatMap(group=>group.rows),4,5),sales=totals(groups.flatMap(group=>group.sales),4,2);
+  for (const metric of entityMetrics) totalRow.append(element("td",metricText(metric.value(metrics,sales),metric.unit)));
+  foot.append(totalRow);node.replaceChildren(head,body,foot);
+}
+function renderEntityChart(config,groups,dailyDays) {
+  const state=entityState[config.id];
+  const selectedMetrics=entityMetrics.filter(metric=>state.metrics.has(metric.id));
+  let selected=state.selected.size?groups.filter(group=>state.selected.has(group.key)):groups.slice(0,6);
+  if (state.total) selected=[{key:"total",path:["Total Geral"],rows:groups.flatMap(group=>group.rows),sales:groups.flatMap(group=>group.sales)}];
+  get(config.id+"-chart-title").textContent=selectedMetrics.map(metric=>metric.label).join(" + ")+" por "+config.singular.toLowerCase()+", por dia";
+  let status=state.total?"Total dos itens da tabela":state.selected.size?state.selected.size+" itens selecionados":
+    groups.length>6?"6 itens com maior gasto · selecione linhas para comparar outros":"Todos os "+groups.length+" itens da tabela";
+  const datasets=[];
+  for (const group of selected) {
+    const byDay=grouped(group.rows,0),bySale=grouped(group.sales,0);
+    selectedMetrics.forEach((metric,metricIndex)=>{
+      const values=dailyDays.map(day=>{
+        if (!byDay.has(day) && !bySale.has(day)) return null;
+        return metric.value(totals(byDay.get(day)||[],4,5),totals(bySale.get(day)||[],4,2));
+      });
+      const position=group.key==="total"?0:groups.findIndex(item=>item.key===group.key);
+      const duplicate=selected.filter(item=>item.path.at(-1)===group.path.at(-1)).length>1;
+      const label=group.path.at(-1)+(duplicate?" ("+group.path.at(-2)+")":"")+(selectedMetrics.length>1?" · "+metric.label:"");
+      datasets.push({...line(label,values,seriesColors[position%seriesColors.length],metric.unit),
+        borderDash:metricIndex?[5+metricIndex*2,3]:[],spanGaps:false,entityKey:group.key,metricId:metric.id,
+        contextLabel:group.path.join(" / ")+" · "+metric.label});
+    });
+  }
+  if (datasets.length && datasets.every(series=>series.data.every(value=>value===null))) status+=" · Métrica indisponível: sem denominador para calcular no período.";
+  if (!groups.length) status="Nenhum item no período e nos filtros selecionados.";
+  get(config.id+"-chart-status").textContent=status;
+  const canvas=get(config.id+"-chart");
+  canvas.setAttribute("aria-label",get(config.id+"-chart-title").textContent);
+  if (typeof Chart!=="function") {
+    get(config.id+"-chart-status").textContent+=" Os valores permanecem disponíveis na tabela.";
+    return;
+  }
+  const scales={};
+  [...new Set(selectedMetrics.map(metric=>metric.unit))].forEach((unit,index)=>{
+    scales[unit]={position:index%2?"right":"left",ticks:{color:color("muted"),font:{size:10},
+      callback:value=>metricText(value,unit),...(unit==="orders"?{precision:0}:{})}};
+  });
+  makeChart(canvas.id,dailyDays.map(day=>[day]),datasets,scales);
+  const chart=charts.get(canvas.id);
+  chart.options.plugins.legend.labels.generateLabels=instance=>Chart.defaults.plugins.legend.labels.generateLabels(instance).map(label=>({
+    ...label,text:label.text.length>43?label.text.slice(0,40)+"…":label.text
+  }));
+  chart.options.plugins.tooltip.callbacks.title=contexts=>contexts[0]?.label||"";
+  chart.options.plugins.tooltip.callbacks.label=context=>context.dataset.contextLabel+": "+metricText(context.parsed.y,context.dataset.yAxisID);
+  chart.update("none");
+}
+
 function render() {
   const hash = location.hash.slice(1);
   const mode = Object.hasOwn(pages, hash) ? hash : "geral";
@@ -243,6 +438,9 @@ function render() {
   }
   get("overview").hidden = isReport;
   get("report").hidden = !isReport;
+  get("entity-analysis").hidden = !isMeta;
+  get("secondary").hidden = isMeta;
+  get("secondary-heading").hidden = isMeta;
   get("period-label").textContent = fullDate.format(new Date(from.value)) + " – " + fullDate.format(new Date(to.value));
   if (isReport) {
     table("daily", ["Data", "Gasto", ...stages, "Pedidos pagos", "Receita", "CTR", "Connect Rate"],
@@ -256,7 +454,7 @@ function render() {
   get("secondary-title").textContent = isMeta ? "Campanhas e criativos" : "Vendas por origem";
   get("secondary-note").textContent = isMeta ? "Expanda uma campanha para ver conjuntos e anúncios. Pedidos e receita por campanha exigem correspondência da UTM." : "As origens são classificadas pelos parâmetros de rastreamento.";
   if (isMeta) {
-    table("secondary-table", metaColumns, breakdown(meta, sales));
+    renderEntityAnalysis(meta, within);
   } else {
     const origins = new Map();
     for (const row of data.salesTracking.filter(within)) {
@@ -272,6 +470,7 @@ function render() {
   }
 }
 function reset() {
+  for (const state of Object.values(entityState)) { state.selected.clear(); state.total=false; }
   get("start").value = days[0];
   get("end").value = days.at(-1);
   get("campaign").value = "";

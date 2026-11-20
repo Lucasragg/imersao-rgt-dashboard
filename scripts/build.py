@@ -131,11 +131,29 @@ def sales_data(meta):
             [list(key) + measures for key, measures in sorted(tracking.items())])
 
 
+def sales_entities(meta, tracking):
+    """Vincula conteúdo UTM ao anúncio apenas quando o nome é inequívoco na campanha."""
+    ads = defaultdict(set)
+    for row in meta:
+        ads[(row[1], normalize(row[3]))].add((row[2], row[3]))
+    totals = defaultdict(lambda: [0, 0])
+    for day, channel, campaign, source, medium, campaign_utm, content, orders, revenue in tracking:
+        if channel != "Meta Ads" or not campaign:
+            continue
+        matches = ads.get((campaign, normalize(content)), set()) if content else set()
+        ad_set, ad = next(iter(matches)) if len(matches) == 1 else ("", "")
+        bucket = totals[(day, campaign, ad_set, ad)]
+        bucket[0] += orders
+        bucket[1] += revenue
+    return [list(key) + measures for key, measures in sorted(totals.items())]
+
+
 def main():
     meta = meta_data()
     sales, tracking = sales_data(meta)
     data = {"generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(), "meta": meta,
-            "sales": sales, "salesTracking": tracking}
+            "sales": sales, "salesTracking": tracking,
+            "salesEntities": sales_entities(meta, tracking)}
     document = (ROOT / "src/index.html").read_text(encoding="utf-8")
     document = document.replace("/* DASHBOARD_CSS */", (ROOT / "src/style.css").read_text(encoding="utf-8"))
     document = document.replace("/* DASHBOARD_JS */", (ROOT / "src/dashboard.js").read_text(encoding="utf-8"))

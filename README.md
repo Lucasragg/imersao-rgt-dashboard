@@ -10,6 +10,8 @@ O build conta transações com pagamento confirmado, deduplica pelo ID e lê o e
 
 A aba `Vendas` tem GID `225855859`. O GID `1710545547` abre `Webhook_Bruto` e não deve substituir a origem de vendas.
 
+Na aba Meta Ads, campanhas, conjuntos e anúncios têm tabelas e gráficos diários próprios. Clique no cabeçalho de uma métrica para exibi-la; Ctrl/⌘ + clique permite comparar métricas. Clique em um valor para mostrar aquele item e métrica, ou selecione várias linhas para comparar itens. Seleções de campanhas filtram conjuntos e anúncios; seleções de conjuntos filtram anúncios. Sem seleção, os gráficos mostram até seis itens de maior gasto. Clique em Total Geral para mostrar a série agregada. Os totais recalculam taxas a partir das somas, sem somar ou tirar média simples de percentuais. Anúncios homônimos em conjuntos diferentes permanecem separados; só recebem vendas quando `utm_content` identifica um único anúncio dentro da campanha vinculada.
+
 ## GitHub Pages
 
 A partir da raiz, execute `scripts/configure-github.sh Lucasragg imersao-rgt-dashboard` com uma credencial autorizada no ambiente `GH_TOKEN` e as quatro variáveis de origem definidas. O script configura Actions, permissões do workflow, Pages e variáveis via API, envia os arquivos para `main`, aguarda o build disparado pelo push e verifica a URL. `workflow_dispatch` fica disponível para os próximos builds disparados pelo cron-job.org.
