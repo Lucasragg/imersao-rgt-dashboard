@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Validar atribuição de vendas
+        run: python3 -m unittest discover -s tests -v
       - name: Gerar dashboard com os dados atualizados
         env:
           META_SHEET_ID: ${{ vars.META_SHEET_ID }}

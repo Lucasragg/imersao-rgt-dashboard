@@ -254,7 +254,7 @@ function renderEntityAnalysis(meta, within) {
       card.append(heading,scroller,chartHeader,chartBox);
       root.append(card);
     }
-    root.append(element("p","Vendas e faturamento vêm da aba Vendas. Campanhas exigem correspondência da UTM; conjuntos e anúncios exigem um nome de anúncio único na campanha em utm_content. Vendas sem esse vínculo não são distribuídas entre itens.","note attribution-footnote"));
+    root.append(element("p","Vendas e faturamento vêm da aba Vendas. Campanhas exigem correspondência da UTM; conjuntos e anúncios exigem utm_content identificando o anúncio, usando utm_medium para distinguir conjuntos quando necessário. Vendas sem vínculo inequívoco não são distribuídas entre itens.","note attribution-footnote"));
   }
   const entitySales=(data.salesEntities || []).filter(within);
   const dailyDays=days.filter(day=>within([day]));

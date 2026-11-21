@@ -49,12 +49,13 @@ checkout="$(mktemp -d)"
 trap 'rm -rf "$checkout"' EXIT
 credentials=(-c credential.helper= -c 'credential.helper=!gh auth git-credential')
 git "${credentials[@]}" clone --branch main "https://github.com/$repo.git" "$checkout"
-mkdir -p "$checkout/.github/workflows" "$checkout/src" "$checkout/scripts"
+mkdir -p "$checkout/.github/workflows" "$checkout/src" "$checkout/scripts" "$checkout/tests"
 cp "$root/.github/workflows/pages.yml" "$checkout/.github/workflows/pages.yml"
 cp "$root/src/"* "$checkout/src/"
 cp "$root/scripts/build.py" "$root/scripts/configure-github.sh" "$checkout/scripts/"
+cp "$root/tests/"*.py "$checkout/tests/"
 cp "$root/.gitignore" "$root/README.md" "$checkout/"
-git -C "$checkout" add .github/workflows/pages.yml src scripts .gitignore README.md
+git -C "$checkout" add .github/workflows/pages.yml src scripts tests .gitignore README.md
 if git -C "$checkout" diff --cached --quiet; then
   printf 'O código já está em main. Último build disponível:\n'
   gh run list --repo "$repo" --workflow pages.yml --limit 1

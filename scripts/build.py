@@ -90,13 +90,15 @@ def classify(values, campaign_index):
     origin = normalize(values["src"])
     match = campaign_index.get(campaign, "")
     organic = {"organic", "organico", "whatsapp", "grupos", "email", "direct", "direto"}
-    if origin in organic or medium in organic or source in organic:
+    if medium in organic or source in organic:
         return "Outros canais", ""
     if match or source in {"meta", "metaads", "facebookads", "instagramads", "fbads", "igads"}:
         return "Meta Ads", match
     paid = {"paid", "paidmedia", "paidsocial", "cpc", "cpm", "ads", "trafegopago"}
     if source in {"fb", "ig", "facebook", "instagram"} and (medium in paid or origin in paid):
         return "Meta Ads", match
+    if origin in organic:
+        return "Outros canais", ""
     if source:
         if source in {"fb", "ig", "facebook", "instagram"}:
             return "Sem atribuição", ""
@@ -132,7 +134,7 @@ def sales_data(meta):
 
 
 def sales_entities(meta, tracking):
-    """Vincula conteúdo UTM ao anúncio apenas quando o nome é inequívoco na campanha."""
+    """Vincula anúncio inequívoco, usando utm_medium para distinguir conjuntos."""
     ads = defaultdict(set)
     for row in meta:
         ads[(row[1], normalize(row[3]))].add((row[2], row[3]))
@@ -141,6 +143,10 @@ def sales_entities(meta, tracking):
         if channel != "Meta Ads" or not campaign:
             continue
         matches = ads.get((campaign, normalize(content)), set()) if content else set()
+        if len(matches) > 1 and medium:
+            by_set = {item for item in matches if normalize(item[0]) == normalize(medium)}
+            if len(by_set) == 1:
+                matches = by_set
         ad_set, ad = next(iter(matches)) if len(matches) == 1 else ("", "")
         bucket = totals[(day, campaign, ad_set, ad)]
         bucket[0] += orders
