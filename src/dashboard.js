@@ -156,12 +156,12 @@ function dailyValues(metrics, sales) {
   const [spend, impressions, clicks, views, checkouts] = metrics;
   const [orders, revenue] = sales;
   return [money(spend), per(spend*1000,impressions),percent(clicks,impressions),percent(views,clicks),
-    percent(checkouts,views),percent(orders,checkouts),numbers.format(orders),money(revenue),per(spend,orders),
+    percent(checkouts,views),per(spend,checkouts),percent(orders,checkouts),numbers.format(orders),money(revenue),per(spend,orders),
     spend ? numbers.format(Math.round(revenue/spend*100)/100)+"x" : "—"];
 }
 function renderDaily(daily, summary, sales) {
   const weekday = new Intl.DateTimeFormat("pt-BR",{weekday:"short",timeZone:"UTC"});
-  const headings = ["Data","Dia","Gasto","CPM","CTR","CR","VisCHK","ConvCHK","Vendas","Faturamento","CAC","ROAS"];
+  const headings = ["Data","Dia","Gasto","CPM","CTR","CR","VisCHK","Custo por IC","ConvCHK","Vendas","Faturamento","CAC","ROAS"];
   table("trend-table", headings, [...daily].reverse().map(([day, metrics, sales]) => {
     const button = element("button",fullDate.format(new Date(day)),"date-link");
     button.type="button";
@@ -177,7 +177,7 @@ function renderDaily(daily, summary, sales) {
     const source=[...daily].reverse()[index];
     if (!source) return;
     row.cells[2].style.backgroundColor="rgb(239 68 68 / "+(.08+.3*source[1][0]/maxSpend)+")";
-    row.cells[9].style.backgroundColor="rgb(34 197 94 / "+(.08+.3*source[2][1]/maxRevenue)+")";
+    row.cells[10].style.backgroundColor="rgb(34 197 94 / "+(.08+.3*source[2][1]/maxRevenue)+")";
   });
 }
 
@@ -187,6 +187,7 @@ const entityMetrics = [
   {id:"ctr",label:"CTR",unit:"percent",value:(m,s)=>ratio(m[2],m[1],100)},
   {id:"cr",label:"CR",unit:"percent",value:(m,s)=>ratio(m[3],m[2],100)},
   {id:"vischk",label:"VisCHK",unit:"percent",value:(m,s)=>ratio(m[4],m[3],100)},
+  {id:"cpic",label:"Custo por IC",unit:"money",value:(m,s)=>ratio(m[0]/100,m[4])},
   {id:"convchk",label:"ConvCHK",unit:"percent",value:(m,s)=>ratio(s[0],m[4],100)},
   {id:"orders",label:"Vendas",unit:"orders",value:(m,s)=>s[0]},
   {id:"cac",label:"CAC",unit:"money",value:(m,s)=>ratio(m[0]/100,s[0])},
