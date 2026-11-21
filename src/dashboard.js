@@ -208,20 +208,21 @@ function metricText(value, unit) {
   if (unit === "roas") return numbers.format(Math.round(value*100)/100)+"x";
   return numbers.format(value);
 }
-function entityKey(row, level) { return JSON.stringify(row.slice(1,level+1)); }
+function entityPath(row, level) { return level === 3 ? [row[3]] : row.slice(1,level+1); }
+function entityKey(row, level) { return JSON.stringify(entityPath(row,level)); }
 function entityGroups(rows, level, sales) {
   const groups = new Map();
   const knownKeys = new Set(data.meta.map(row=>entityKey(row,level)));
   for (const row of rows) {
     const key=entityKey(row,level);
-    if (!groups.has(key)) groups.set(key,{key,path:row.slice(1,level+1),rows:[],sales:[]});
+    if (!groups.has(key)) groups.set(key,{key,path:entityPath(row,level),rows:[],sales:[]});
     groups.get(key).rows.push(row);
   }
   for (const sale of sales) {
     if (sale.slice(1,level+1).some(name=>!name)) continue;
     const key=entityKey(sale,level);
     if (!knownKeys.has(key)) continue;
-    if (!groups.has(key)) groups.set(key,{key,path:sale.slice(1,level+1),rows:[],sales:[]});
+    if (!groups.has(key)) groups.set(key,{key,path:entityPath(sale,level),rows:[],sales:[]});
     groups.get(key).sales.push(sale);
   }
   return [...groups.values()].sort((a,b)=>totals(b.rows,4,5)[0]-totals(a.rows,4,5)[0] || a.key.localeCompare(b.key));
